@@ -261,6 +261,9 @@
 # [*manage_startup_script*]
 #  If the init script should be managed by this module. Attention: This might cause problems with some config options of this module (e.g server_configfile_path)
 #
+# [*firewallchain*]
+#   Specify the name of the firewall chain to add the rules to.
+#
 # === Example
 #
 #   When running everything on a single node, please check
@@ -382,6 +385,7 @@ class zabbix::server (
   String $additional_service_params = $zabbix::params::additional_service_params,
   Optional[String[1]] $zabbix_user  = $zabbix::params::server_zabbix_user,
   Boolean $manage_startup_script    = $zabbix::params::manage_startup_script,
+  Optional[String]                  = $zabbix::params::firewallchain,
 ) inherits zabbix::params {
 
   # the following codeblock is a bit blargh. The correct default value for
@@ -554,6 +558,7 @@ class zabbix::server (
       dport  => $listenport,
       proto  => 'tcp',
       action => 'accept',
+      chain  => $firewallchain,
       state  => [
         'NEW',
         'RELATED',
