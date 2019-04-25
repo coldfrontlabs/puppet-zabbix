@@ -192,6 +192,9 @@
 # [*manage_startup_script*]
 #  If the init script should be managed by this module. Attention: This might cause problems with some config options of this module (e.g agent_configfile_path)
 #
+# [*firewallchain*]
+#   Specify the name of the firewall chain to add the rules to.
+#
 # === Example
 #
 #  Basic installation:
@@ -282,6 +285,7 @@ class zabbix::agent (
   String $additional_service_params               = $zabbix::params::additional_service_params,
   String $service_type                            = $zabbix::params::service_type,
   Boolean $manage_startup_script                  = $zabbix::params::manage_startup_script,
+  Optional[String] $firewallchain                 = $zabbix::params::firewallchain
 ) inherits zabbix::params {
 
   # the following two codeblocks are a bit blargh. The correct default value for
@@ -440,6 +444,7 @@ class zabbix::agent (
       proto  => 'tcp',
       action => 'accept',
       source => $server,
+      chain  => $firewallchain,
       state  => [
         'NEW',
         'RELATED',
