@@ -264,6 +264,9 @@
 # [*loadmodule*]
 #   Module to load at server startup.
 #
+# [*firewallchain*]
+#   Specify the name of the firewall chain to add the rules to.
+#
 # === Example
 #
 #  When you want to run everything on one machine, you can use the following
@@ -423,6 +426,7 @@ class zabbix::proxy (
   $loadmodulepath                  = $zabbix::params::proxy_loadmodulepath,
   $loadmodule                      = $zabbix::params::proxy_loadmodule,
   Boolean $manage_selinux          = $zabbix::params::manage_selinux,
+  Optional[String] $firewallchain  = $zabbix::params::firewallchain,
   ) inherits zabbix::params {
 
   # check osfamily, Arch is currently not supported for web
@@ -614,6 +618,7 @@ class zabbix::proxy (
     firewall { '151 zabbix-proxy':
       dport  => $listenport,
       proto  => 'tcp',
+      chain => $firewallchain,
       action => 'accept',
       state  => [
         'NEW',
