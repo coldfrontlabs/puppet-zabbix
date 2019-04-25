@@ -179,6 +179,7 @@ class zabbix (
   String $additional_service_params         = $zabbix::params::additional_service_params,
   Optional[String[1]] $zabbix_user          = $zabbix::params::server_zabbix_user,
   Optional[String] $zabbix_server_name      = $zabbix::params::zabbix_server,
+  Optional[String] $firewallchain           = $zabbix::params::firewallchain,
 ) inherits zabbix::params {
 
   class { '::zabbix::web':
@@ -300,6 +301,7 @@ class zabbix (
     loadmodule                => $loadmodule,
     manage_selinux            => $manage_selinux,
     additional_service_params => $additional_service_params,
+    firewallchain             => $firewallchain,
     require                   => Class['zabbix::database'],
   }
 
