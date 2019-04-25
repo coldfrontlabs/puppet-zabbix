@@ -107,6 +107,7 @@ class zabbix::params {
   $manage_startup_script                    = true
   $default_vhost                            = false
   $manage_firewall                          = false
+  $firewallchain                            = undef
   $manage_apt                               = true
   $repo_location                            = ''
   $manage_resources                         = false
