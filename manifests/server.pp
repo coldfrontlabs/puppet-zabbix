@@ -385,7 +385,7 @@ class zabbix::server (
   String $additional_service_params = $zabbix::params::additional_service_params,
   Optional[String[1]] $zabbix_user  = $zabbix::params::server_zabbix_user,
   Boolean $manage_startup_script    = $zabbix::params::manage_startup_script,
-  Optional[String]                  = $zabbix::params::firewallchain,
+  Optional[String] $firewallchain   = $zabbix::params::firewallchain,
 ) inherits zabbix::params {
 
   # the following codeblock is a bit blargh. The correct default value for
