@@ -68,7 +68,6 @@ class zabbix::javagateway (
     firewall { '152 zabbix-javagateway':
       dport  => $listenport,
       proto  => 'tcp',
-      chain  => $firewallchain,
       action => 'accept',
       state  => ['NEW','RELATED', 'ESTABLISHED'],
     }

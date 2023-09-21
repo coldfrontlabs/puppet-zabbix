@@ -521,7 +521,6 @@ class zabbix::proxy (
     firewall { '151 zabbix-proxy':
       dport  => $listenport,
       proto  => 'tcp',
-      chain => $firewallchain,
       action => 'accept',
       state  => [
         'NEW',

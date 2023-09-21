@@ -150,7 +150,8 @@ class zabbix::params {
   $manage_service                           = true
   $default_vhost                            = false
   $manage_firewall                          = false
-  $firewallchain                            = undef
+  $use_firewall_chain                       = false
+  $firewall_priority                        = 150
   $manage_apt                               = true
   $repo_location                            = undef
   $unsupported_repo_location                = undef

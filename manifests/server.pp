@@ -463,7 +463,6 @@ class zabbix::server (
       dport  => $listenport,
       proto  => 'tcp',
       action => 'accept',
-      chain  => $firewallchain,
       state  => [
         'NEW',
         'RELATED',

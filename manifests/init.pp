@@ -486,7 +486,6 @@ class zabbix (
     loadmodule                => $loadmodule,
     manage_selinux            => $manage_selinux,
     additional_service_params => $additional_service_params,
-    firewallchain             => $firewallchain,
     require                   => Class['zabbix::database'],
   }
 
