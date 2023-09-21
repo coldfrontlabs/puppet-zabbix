@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'spec_helper'
 
 describe 'zabbix::database' do
@@ -5,8 +7,10 @@ describe 'zabbix::database' do
     'rspec.puppet.com'
   end
 
-  on_supported_os.each do |os, facts|
-    context "on #{os} " do
+  on_supported_os(baseline_os_hash).each do |os, facts|
+    next if facts[:os]['name'] == 'windows'
+
+    context "on #{os}" do
       let :facts do
         facts
       end
@@ -23,6 +27,10 @@ describe 'zabbix::database' do
           include 'mysql::server'
         EOS
       end
+
+      # The zabbix server was never supposed to work on Gentoo, just the agent
+      # We need to skip through those tests
+      next if facts[:os]['name'] == 'Gentoo'
 
       describe 'database_type is postgresql, zabbix_type is server and is multiple host setup' do
         let :params do
@@ -117,6 +125,33 @@ describe 'zabbix::database' do
         it { is_expected.to contain_postgresql__server__pg_hba_rule('Allow zabbix-proxy to access database').with_address('127.0.0.1/32') }
         it { is_expected.to contain_postgresql__server__db('zabbix-proxy') }
         it { is_expected.to contain_class('zabbix::params') }
+      end
+
+      describe 'database_type is postgresql, tablespace is not explicitly set' do
+        let :params do
+          {
+            database_type: 'postgresql',
+            database_name: 'zabbix-server',
+            database_user: 'zabbix-server',
+            zabbix_type: 'server'
+          }
+        end
+
+        it { is_expected.to contain_postgresql__server__db('zabbix-server').with_tablespace(nil) }
+      end
+
+      describe 'database_type is postgresql, tablespace is explicitly set' do
+        let :params do
+          {
+            database_type: 'postgresql',
+            database_name: 'zabbix-server',
+            database_user: 'zabbix-server',
+            zabbix_type: 'server',
+            database_tablespace: 'zabbix'
+          }
+        end
+
+        it { is_expected.to contain_postgresql__server__db('zabbix-server').with_tablespace('zabbix') }
       end
 
       describe 'database_type is mysql, zabbix_type is server and is multiple host setup' do

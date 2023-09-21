@@ -1,83 +1,43 @@
-# == Class: zabbix::database
-#
-#  This will install the correct database and one or more users
-#  for correct usage
-#
-# === Requirements
-#
-#  The following is needed (or):
-#   - puppetlabs-mysql
-#   - puppetlabs-postgresql
-#
-# === Parameters
-#
-# [*zabbix_type*]
+# @summary This will install the correct database and one or more users for correct usage
+# @param zabbix_type
 #   The type of zabbix which is used: server or proxy.
 #   This will determine what sql files will be loaded into database.
-#
-# [*zabbix_web*]
+# @param zabbix_web
 #   This is the hostname of the server which is running the
 #   zabbix-web package. This parameter is used when database_type =
 #   mysql. When single node: localhost
-#
-# [*zabbix_web_ip*]
+# @param zabbix_web_ip
 #   This is the ip address of the server which is running the
 #   zabbix-web package. This parameter is used when database_type =
 #   postgresql. When single node: 127.0.0.1
-#
-# [*zabbix_server*]
+# @param zabbix_server
 #   This is the FQDN for the host running zabbix-server. This parameter
 #   is used when database_type = mysql. Default: localhost
-#
-# [*zabbix_server_ip*]
+# @param zabbix_server_ip
 #   This is the actual ip address of the host running zabbix-server
 #   This parameter is used when database_type = postgresql. Default:
 #   127.0.0.1
-#
-# [*zabbix_proxy*]
+# @param zabbix_proxy
 #   This is the FQDN for the host running zabbix-proxy. This parameter
 #   is used when database_type = mysql. Default: localhost
-#
-# [*zabbix_proxy_ip*]
+# @param zabbix_proxy_ip
 #   This is the actual ip address of the host running zabbix-proxy
 #   This parameter is used when database_type = postgresql. Default:
 #   127.0.0.1
-#
-# [*manage_database*]
+# @param manage_database
 #   When set to true, it will create the database and will load
 #   the sql files for basic setup. Otherwise you should do this manually.
-#
-# [*database_type*]
-#   The database which is used: postgresql or mysql
-#
-# [*database_name*]
-#   The name of the database. Default: zabbix-server
-#
-# [*database_user*]
-#   The user which is used for connecting to the database
-#   default: zabbix-server
-#
-# [*database_password*]
-#   The password of the database_user.
-#
-# [*database_host*]
-#   The hostname of the server running the database.
-#   default: localhost
-#
-# [* database_charset*]
-#   The default charset of the database.
-#   default: utf8
-#
-# [* database_collate*]
-#   The default collation of the database.
-#   default: utf8_general_ci
-#
-# === Example
-#
-#   When running everything on a single node, please check
-#   documentation in init.pp
-#   The following is an example of an multiple host setup:
-#
+# @param database_type The database which is used: postgresql or mysql
+# @param database_schema_path The path to the directory containing the .sql schema files
+# @param database_name The name of the database. Default: zabbix-server
+# @param database_user The user which is used for connecting to the database
+# @param database_password The password of the database_user.
+# @param database_host The hostname of the server running the database.
+# @param database_host_ip IP of the machine the database runs on.
+# @param database_charset The default charset of the database.
+# @param database_collate The default collation of the database.
+# @param database_tablespace The tablespace the database will be created in. This setting only affects PostgreSQL databases.
+# @example The following is an example of an multiple host setup:
 #   node 'wdpuppet04.dj-wasabi.local' {
 #     #  class { 'postgresql::server':
 #     #    listen_addresses => '192.168.20.14'
@@ -102,16 +62,8 @@
 #   use the postgresql as database, uncomment the lines of postgresql
 #   class and both *_ip parameters. Comment the mysql class and comment
 #   the zabbix_server and zabbix_web parameter.
-#
-# === Authors
-#
-# Author Name: ikben@werner-dijkerman.nl
-#
-# === Copyright
-#
-# Copyright 2014 Werner Dijkerman
-#
-class zabbix::database(
+# @author Werner Dijkerman ikben@werner-dijkerman.nl
+class zabbix::database (
   $zabbix_type                     = 'server',
   $zabbix_web                      = $zabbix::params::zabbix_web,
   $zabbix_web_ip                   = $zabbix::params::zabbix_web_ip,
@@ -129,24 +81,30 @@ class zabbix::database(
   $database_host_ip                = $zabbix::params::server_database_host_ip,
   $database_charset                = $zabbix::params::server_database_charset,
   $database_collate                = $zabbix::params::server_database_collate,
+  Optional[String[1]] $database_tablespace = $zabbix::params::server_database_tablespace,
 ) inherits zabbix::params {
-
   # So lets create the databases and load all files. This can only be
   # happen when manage_database is set to true (Default).
   if $manage_database == true {
+    # Complain if database_tablespace is set and the database_type is not postgresql
+    if ($database_tablespace and $database_type != 'postgresql') {
+      fail("database_tablespace is set to '${database_tablespace}'. This setting is only useful for PostgreSQL databases.")
+    }
+
     case $database_type {
       'postgresql': {
         # This is the PostgreSQL part.
         # Create the postgres database.
         postgresql::server::db { $database_name:
-          user     => $database_user,
-          owner    => $database_user,
-          password => postgresql_password($database_user, $database_password),
-          require  => Class['postgresql::server'],
+          user       => $database_user,
+          owner      => $database_user,
+          password   => postgresql::postgresql_password($database_user, $database_password),
+          require    => Class['postgresql::server'],
+          tablespace => $database_tablespace,
         }
 
         # When database not in some server with zabbix server include pg_hba_rule to server
-        if ($database_host_ip != $zabbix_server_ip) or ($zabbix_web_ip != $zabbix_server_ip){
+        if ($database_host_ip != $zabbix_server_ip) or ($zabbix_web_ip != $zabbix_server_ip) {
           postgresql::server::pg_hba_rule { 'Allow zabbix-server to access database':
             description => 'Open up postgresql for access from zabbix-server',
             type        => 'host',
@@ -222,7 +180,7 @@ class zabbix::database(
         if $zabbix_web != $zabbix_server {
           mysql_user { "${database_user}@${zabbix_web}":
             ensure        => 'present',
-            password_hash => mysql_password($database_password),
+            password_hash => mysql::password($database_password),
           }
 
           # And this is the grant part. It will grant the users which is created earlier
@@ -243,7 +201,7 @@ class zabbix::database(
         } # END if $zabbix_web != $zabbix_server
       }
       'sqlite': {
-        class { '::zabbix::database::sqlite': }
+        class { 'zabbix::database::sqlite': }
       }
       default: {
         fail('Unrecognized database type for server.')
