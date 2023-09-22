@@ -400,6 +400,10 @@ class zabbix::agent (
         jump  => 'ZABBIX-AGENT',
       }
     }
+    $chain = $use_firewall_chain ? {
+      true                    => 'ZABBIX-AGENT',
+      default                 => 'INPUT'
+    }
     $servers = split($server, ',')
     $servers.each |$_server| {
       firewall { "${firewall_priority} zabbix-agent from ${_server}":
@@ -407,12 +411,12 @@ class zabbix::agent (
         proto  => 'tcp',
         action => 'accept',
         source => $_server,
+        chain => $chain
         state  => [
           'NEW',
           'RELATED',
           'ESTABLISHED',
         ],
-        chain => $use_firewall_chain ? 'ZABBIX-AGENT:filter:IPv4' : undef,
       }
     }
   }
