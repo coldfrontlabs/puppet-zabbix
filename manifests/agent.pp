@@ -411,7 +411,7 @@ class zabbix::agent (
         proto  => 'tcp',
         action => 'accept',
         source => $_server,
-        chain => $chain
+        chain => $chain,
         state  => [
           'NEW',
           'RELATED',
