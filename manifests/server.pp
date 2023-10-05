@@ -462,7 +462,7 @@ class zabbix::server (
     firewall { '151 zabbix-server':
       dport  => $listenport,
       proto  => 'tcp',
-      action => 'accept',
+      jump => 'accept',
       state  => [
         'NEW',
         'RELATED',

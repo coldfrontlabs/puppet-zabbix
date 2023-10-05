@@ -409,7 +409,7 @@ class zabbix::agent (
       firewall { "${firewall_priority} zabbix-agent from ${_server}":
         dport  => $listenport,
         proto  => 'tcp',
-        action => 'accept',
+        jump => 'accept',
         source => $_server,
         chain => $chain,
         state  => [
