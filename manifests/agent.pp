@@ -391,17 +391,17 @@ class zabbix::agent (
   # Manage firewall
   if $manage_firewall {
     if $use_firewall_chain {
-      firewallchain { 'ZABBIX-AGENT:filter:IPv4':
+      firewallchain { 'ZABBIX_AGENT:filter:IPv4':
         ensure => present,
         purge => true,
       }
       firewall { "${firewall_priority} zabbix-agent":
         chain => 'INPUT',
-        jump  => 'ZABBIX-AGENT',
+        jump  => 'ZABBIX_AGENT',
       }
     }
     $chain = $use_firewall_chain ? {
-      true                    => 'ZABBIX-AGENT',
+      true                    => 'ZABBIX_AGENT',
       default                 => 'INPUT'
     }
     $servers = split($server, ',')
