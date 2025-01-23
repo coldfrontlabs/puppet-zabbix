@@ -3,6 +3,8 @@
 # @param zabbix_package_state The state of the package that needs to be installed: present or latest.
 # @param zabbix_package_agent The name of the agent package that we manage
 # @param manage_firewall When true, it will create iptables rules.
+# @param use_firewall_chain When true, it will create iptables rules in a chain.
+# @param firewall_priority Set the number to use for the firewall rule.
 # @param manage_repo When true, it will create repository for installing the agent.
 # @param manage_choco
 #   When true on windows, it will use chocolatey to install the agent.
@@ -154,6 +156,8 @@ class zabbix::agent (
   Optional[Stdlib::Windowspath] $zabbix_package_source = undef,
   Boolean $manage_choco                                = $zabbix::params::manage_choco,
   Boolean $manage_firewall                             = $zabbix::params::manage_firewall,
+  Boolean $use_firewall_chain                          = $zabbix::params::use_firewall_chain,
+  Integer $firewall_priority                           = $zabbix::params::firewall_priority,
   Boolean $manage_repo                                 = $zabbix::params::manage_repo,
   Boolean $manage_resources                            = $zabbix::params::manage_resources,
   $monitored_by_proxy                                  = $zabbix::params::monitored_by_proxy,
@@ -375,13 +379,28 @@ class zabbix::agent (
 
   # Manage firewall
   if $manage_firewall {
+    if $use_firewall_chain {
+      firewallchain { 'ZABBIX_AGENT:filter:IPv4':
+        ensure => present,
+        purge => true,
+      }
+      firewall { "${firewall_priority} zabbix-agent":
+        chain => 'INPUT',
+        jump  => 'ZABBIX_AGENT',
+      }
+    }
+    $chain = $use_firewall_chain ? {
+      true                    => 'ZABBIX_AGENT',
+      default                 => 'INPUT'
+    }
     $servers = split($server, ',')
     $servers.each |$_server| {
-      firewall { "150 zabbix-agent from ${_server}":
+      firewall { "${firewall_priority} zabbix-agent from ${_server}":
         dport  => $listenport,
         proto  => 'tcp',
         jump   => 'accept',
         source => $_server,
+        chain => $chain,
         state  => [
           'NEW',
           'RELATED',
