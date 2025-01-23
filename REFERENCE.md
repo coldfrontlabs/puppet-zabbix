@@ -23,6 +23,7 @@
 * [`zabbix::server`](#zabbix--server): This will install and configure the zabbix-server deamon
 * [`zabbix::userparameter`](#zabbix--userparameter): This class can be used when you use hiera or The Foreman. With this tools you can't use and define. This make use of "create_resources".
 * [`zabbix::web`](#zabbix--web): This will install the zabbix-web package and install an virtual host.
+* [`zabbix::zabbixapi`](#zabbix--zabbixapi): This will install the zabbixapi gem.
 * [`zabbix::zapache`](#zabbix--zapache): This will install and configure the zapache monitoring script Upstream: https://github.com/lorf/zapache
 
 #### Private Classes
@@ -40,18 +41,18 @@
 
 ### Resource types
 
-* [`zabbix_application`](#zabbix_application): %q(Manage zabbix applications      zabbix_application{"app1":       ensure   => present,       template => 'template1',     }  It Raise excep
-* [`zabbix_host`](#zabbix_host): FQDN of the machine.
+* [`zabbix_application`](#zabbix_application): Manage zabbix applications  Example:   zabbix_application{"app1":     ensure   => present,     template => 'template1',   } It Raise exceptio
+* [`zabbix_host`](#zabbix_host): Manage zabbix hosts
 * [`zabbix_hostgroup`](#zabbix_hostgroup): Manage zabbix hostgroups
-* [`zabbix_proxy`](#zabbix_proxy): FQDN of the proxy.
-* [`zabbix_template`](#zabbix_template): The name of template.
-* [`zabbix_template_host`](#zabbix_template_host): Link or Unlink template to host. Only for Zabbix < 6.0! Example. Name should be in the format of "template_name@hostname"  zabbix_template_ho
-* [`zabbix_userparameters`](#zabbix_userparameters): An unique name for this define.
+* [`zabbix_proxy`](#zabbix_proxy): Manage zabbix proxies
+* [`zabbix_template`](#zabbix_template): Manage zabbix templates
+* [`zabbix_template_host`](#zabbix_template_host): Link or Unlink template to host. Only for Zabbix < 6.0!  Example:   zabbix_template_host{ 'mysql_template@db1':     ensure => present,   } Na
+* [`zabbix_userparameters`](#zabbix_userparameters): Manage zabbix user templates
 
 ### Data types
 
 * [`Zabbix::Databases`](#Zabbix--Databases): Type for supported databases by the zabbix module
-* [`Zabbix::Historyics`](#Zabbix--Historyics)
+* [`Zabbix::Historyics`](#Zabbix--Historyics): Type for size values in bytes (also allows k/K and m/M as appendix)
 
 ## Classes
 
@@ -146,6 +147,7 @@ The following parameters are available in the `zabbix` class:
 * [`startpollers`](#-zabbix--startpollers)
 * [`startpreprocessors`](#-zabbix--startpreprocessors)
 * [`startipmipollers`](#-zabbix--startipmipollers)
+* [`startodbcpollers`](#-zabbix--startodbcpollers)
 * [`startpollersunreachable`](#-zabbix--startpollersunreachable)
 * [`starttrappers`](#-zabbix--starttrappers)
 * [`startpingers`](#-zabbix--startpingers)
@@ -740,6 +742,14 @@ Number of pre-forked instances of ipmi pollers.
 
 Default value: `$zabbix::params::server_startipmipollers`
 
+##### <a name="-zabbix--startodbcpollers"></a>`startodbcpollers`
+
+Data type: `Integer[0, 1000]`
+
+Number of pre-forked instances of ODBC pollers.
+
+Default value: `$zabbix::params::server_startodbcpollers`
+
 ##### <a name="-zabbix--startpollersunreachable"></a>`startpollersunreachable`
 
 Data type: `Any`
@@ -1317,7 +1327,7 @@ This will install and configure the zabbix-agent deamon
 
 ```puppet
 class { 'zabbix::agent':
-  zabbix_version => '5.2',
+  zabbix_version => '6.0',
   server         => '192.168.1.1',
 }
 ```
@@ -1329,6 +1339,19 @@ class { 'zabbix::agent':
   manage_resources   => true,
   monitored_by_proxy => 'my_proxy_host',
   server             => '192.168.1.1',
+}
+```
+
+##### Using Zabbix Agent 2
+
+```puppet
+class { 'zabbix::agent':
+  agent_configfile_path => '/etc/zabbix/zabbix_agent2.conf',
+  include_dir           => '/etc/zabbix/zabbix_agent2.d',
+  include_dir_purge     => false,
+  zabbix_package_agent  => 'zabbix-agent2',
+  servicename           => 'zabbix-agent2',
+  manage_startup_script => false,
 }
 ```
 
@@ -1347,7 +1370,6 @@ The following parameters are available in the `zabbix::agent` class:
 * [`manage_resources`](#-zabbix--agent--manage_resources)
 * [`monitored_by_proxy`](#-zabbix--agent--monitored_by_proxy)
 * [`agent_use_ip`](#-zabbix--agent--agent_use_ip)
-* [`zbx_group`](#-zabbix--agent--zbx_group)
 * [`zbx_groups`](#-zabbix--agent--zbx_groups)
 * [`zbx_group_create`](#-zabbix--agent--zbx_group_create)
 * [`zbx_templates`](#-zabbix--agent--zbx_templates)
@@ -1514,14 +1536,6 @@ When true, when creating hosts via the zabbix-api, it will configure that
 connection should me made via ip, not fqdn.
 
 Default value: `$zabbix::params::agent_use_ip`
-
-##### <a name="-zabbix--agent--zbx_group"></a>`zbx_group`
-
-Data type: `Any`
-
-*Deprecated* (see zbx_groups) Name of the hostgroup where this host needs to be added.
-
-Default value: `$zabbix::params::agent_zbx_group`
 
 ##### <a name="-zabbix--agent--zbx_groups"></a>`zbx_groups`
 
@@ -1846,7 +1860,7 @@ Default value: `$zabbix::params::agent_timeout`
 
 ##### <a name="-zabbix--agent--tlsaccept"></a>`tlsaccept`
 
-Data type: `Optional[Enum['unencrypted','psk','cert']]`
+Data type: `Optional[Variant[Array[Enum['unencrypted','psk','cert']],Enum['unencrypted','psk','cert']]]`
 
 What incoming connections to accept from Zabbix server. Used for a passive proxy, ignored on an active proxy.
 
@@ -2336,7 +2350,7 @@ This will install and configure the zabbix-agent deamon
 
 ```puppet
 class { 'zabbix::javagateway':
-  zabbix_version => '5.2',
+  zabbix_version => '6.0',
 }
 ```
 
@@ -2544,10 +2558,12 @@ The following parameters are available in the `zabbix::proxy` class:
 * [`offlinebuffer`](#-zabbix--proxy--offlinebuffer)
 * [`heartbeatfrequency`](#-zabbix--proxy--heartbeatfrequency)
 * [`configfrequency`](#-zabbix--proxy--configfrequency)
+* [`proxyconfigfrequency`](#-zabbix--proxy--proxyconfigfrequency)
 * [`datasenderfrequency`](#-zabbix--proxy--datasenderfrequency)
 * [`startpollers`](#-zabbix--proxy--startpollers)
 * [`startpreprocessors`](#-zabbix--proxy--startpreprocessors)
 * [`startipmipollers`](#-zabbix--proxy--startipmipollers)
+* [`startodbcpollers`](#-zabbix--proxy--startodbcpollers)
 * [`startpollersunreachable`](#-zabbix--proxy--startpollersunreachable)
 * [`starttrappers`](#-zabbix--proxy--starttrappers)
 * [`startpingers`](#-zabbix--proxy--startpingers)
@@ -2598,6 +2614,7 @@ The following parameters are available in the `zabbix::proxy` class:
 * [`fpinglocation`](#-zabbix--proxy--fpinglocation)
 * [`fping6location`](#-zabbix--proxy--fping6location)
 * [`sshkeylocation`](#-zabbix--proxy--sshkeylocation)
+* [`statsallowedip`](#-zabbix--proxy--statsallowedip)
 * [`sslcalocation_dir`](#-zabbix--proxy--sslcalocation_dir)
 * [`sslcertlocation_dir`](#-zabbix--proxy--sslcertlocation_dir)
 * [`sslkeylocation_dir`](#-zabbix--proxy--sslkeylocation_dir)
@@ -3002,6 +3019,14 @@ How often proxy retrieves configuration data from Zabbix Server in seconds.
 
 Default value: `$zabbix::params::proxy_configfrequency`
 
+##### <a name="-zabbix--proxy--proxyconfigfrequency"></a>`proxyconfigfrequency`
+
+Data type: `Optional[Integer[1,604800]]`
+
+How often proxy retrieves configuration data from Zabbix Server in seconds (Zabbix 6.4).
+
+Default value: `$zabbix::params::proxy_proxyconfigfrequency`
+
 ##### <a name="-zabbix--proxy--datasenderfrequency"></a>`datasenderfrequency`
 
 Data type: `Any`
@@ -3033,6 +3058,14 @@ Data type: `Any`
 Number of pre-forked instances of ipmi pollers.
 
 Default value: `$zabbix::params::proxy_startipmipollers`
+
+##### <a name="-zabbix--proxy--startodbcpollers"></a>`startodbcpollers`
+
+Data type: `Integer[0, 1000]`
+
+Number of pre-forked instances of ODBC pollers.
+
+Default value: `$zabbix::params::proxy_startodbcpollers`
 
 ##### <a name="-zabbix--proxy--startpollersunreachable"></a>`startpollersunreachable`
 
@@ -3246,7 +3279,7 @@ Default value: `$zabbix::params::proxy_timeout`
 
 ##### <a name="-zabbix--proxy--tlsaccept"></a>`tlsaccept`
 
-Data type: `Any`
+Data type: `Optional[Variant[Array[Enum['unencrypted','psk','cert']],Enum['unencrypted','psk','cert']]]`
 
 What incoming connections to accept from Zabbix server. Used for a passive proxy, ignored on an active proxy.
 
@@ -3442,6 +3475,14 @@ Location of public and private keys for ssh checks and actions.
 
 Default value: `$zabbix::params::proxy_sshkeylocation`
 
+##### <a name="-zabbix--proxy--statsallowedip"></a>`statsallowedip`
+
+Data type: `Optional[String[1]]`
+
+list of allowed ipadresses that can access the internal stats of zabbix proxy over network
+
+Default value: `$zabbix::params::proxy_statsallowedip`
+
 ##### <a name="-zabbix--proxy--sslcalocation_dir"></a>`sslcalocation_dir`
 
 Data type: `Optional[Stdlib::Absolutepath]`
@@ -3606,7 +3647,6 @@ The following parameters are available in the `zabbix::resources::agent` class:
 * [`ipaddress`](#-zabbix--resources--agent--ipaddress)
 * [`use_ip`](#-zabbix--resources--agent--use_ip)
 * [`port`](#-zabbix--resources--agent--port)
-* [`group`](#-zabbix--resources--agent--group)
 * [`groups`](#-zabbix--resources--agent--groups)
 * [`group_create`](#-zabbix--resources--agent--group_create)
 * [`templates`](#-zabbix--resources--agent--templates)
@@ -3648,14 +3688,6 @@ Default value: `undef`
 Data type: `Any`
 
 The port that the zabbix agent is listening on.
-
-Default value: `undef`
-
-##### <a name="-zabbix--resources--agent--group"></a>`group`
-
-Data type: `Any`
-
-*Deprecated* (see groups parameter) Name of the hostgroup.
 
 Default value: `undef`
 
@@ -3947,6 +3979,7 @@ The following parameters are available in the `zabbix::server` class:
 * [`startpollers`](#-zabbix--server--startpollers)
 * [`startpreprocessors`](#-zabbix--server--startpreprocessors)
 * [`startipmipollers`](#-zabbix--server--startipmipollers)
+* [`startodbcpollers`](#-zabbix--server--startodbcpollers)
 * [`startpollersunreachable`](#-zabbix--server--startpollersunreachable)
 * [`starttrappers`](#-zabbix--server--starttrappers)
 * [`startpingers`](#-zabbix--server--startpingers)
@@ -4007,6 +4040,7 @@ The following parameters are available in the `zabbix::server` class:
 * [`proxydatafrequency`](#-zabbix--server--proxydatafrequency)
 * [`allowroot`](#-zabbix--server--allowroot)
 * [`include_dir`](#-zabbix--server--include_dir)
+* [`statsallowedip`](#-zabbix--server--statsallowedip)
 * [`loadmodulepath`](#-zabbix--server--loadmodulepath)
 * [`loadmodule`](#-zabbix--server--loadmodule)
 * [`sslcertlocation_dir`](#-zabbix--server--sslcertlocation_dir)
@@ -4016,6 +4050,8 @@ The following parameters are available in the `zabbix::server` class:
 * [`zabbix_user`](#-zabbix--server--zabbix_user)
 * [`manage_startup_script`](#-zabbix--server--manage_startup_script)
 * [`socketdir`](#-zabbix--server--socketdir)
+* [`hanodename`](#-zabbix--server--hanodename)
+* [`nodeaddress`](#-zabbix--server--nodeaddress)
 
 ##### <a name="-zabbix--server--database_type"></a>`database_type`
 
@@ -4329,6 +4365,14 @@ Data type: `Any`
 Number of pre-forked instances of ipmi pollers.
 
 Default value: `$zabbix::params::server_startipmipollers`
+
+##### <a name="-zabbix--server--startodbcpollers"></a>`startodbcpollers`
+
+Data type: `Integer[0, 1000]`
+
+Number of pre-forked instances of ODBC pollers.
+
+Default value: `$zabbix::params::server_startodbcpollers`
 
 ##### <a name="-zabbix--server--startpollersunreachable"></a>`startpollersunreachable`
 
@@ -4822,6 +4866,14 @@ You may include individual files or all files in a directory in the configuratio
 
 Default value: `$zabbix::params::server_include`
 
+##### <a name="-zabbix--server--statsallowedip"></a>`statsallowedip`
+
+Data type: `Optional[String[1]]`
+
+list of allowed ipadresses that can access the internal stats of zabbix server over network
+
+Default value: `$zabbix::params::server_statsallowedip`
+
 ##### <a name="-zabbix--server--loadmodulepath"></a>`loadmodulepath`
 
 Data type: `Any`
@@ -4890,10 +4942,27 @@ Default value: `$zabbix::params::manage_startup_script`
 
 Data type: `Optional[Stdlib::Absolutepath]`
 
+
+
+Default value: `$zabbix::params::server_socketdir`
+
+##### <a name="-zabbix--server--hanodename"></a>`hanodename`
+
+Data type: `Optional[String[1]]`
+
+Node name identifier in HA setup
+
+Default value: `$zabbix::params::server_hanodename`
+
+##### <a name="-zabbix--server--nodeaddress"></a>`nodeaddress`
+
+Data type: `Optional[String[1]]`
+
+Connection details to the HA node, used to check if zabbix-web can talk to zabbix server
 IPC socket directory.
 Directory to store IPC sockets used by internal Zabbix services.
 
-Default value: `$zabbix::params::server_socketdir`
+Default value: `$zabbix::params::server_nodeaddress`
 
 ### <a name="zabbix--userparameter"></a>`zabbix::userparameter`
 
@@ -4936,7 +5005,6 @@ node 'wdpuppet02.dj-wasabi.local' {
   class { 'apache':
       mpm_module => 'prefork',
   }
-  class { 'apache::mod::php': }
   class { 'zabbix::web':
     zabbix_url    => 'zabbix.dj-wasabi.nl',
     zabbix_server => 'wdpuppet03.dj-wasabi.local',
@@ -5002,6 +5070,7 @@ The following parameters are available in the `zabbix::web` class:
 * [`saml_settings`](#-zabbix--web--saml_settings)
 * [`puppetgem`](#-zabbix--web--puppetgem)
 * [`manage_selinux`](#-zabbix--web--manage_selinux)
+* [`apache_vhost_custom_params`](#-zabbix--web--apache_vhost_custom_params)
 
 ##### <a name="-zabbix--web--zabbix_url"></a>`zabbix_url`
 
@@ -5426,6 +5495,41 @@ Data type: `Boolean`
 Whether we should manage SELinux rules.
 
 Default value: `$zabbix::params::manage_selinux`
+
+##### <a name="-zabbix--web--apache_vhost_custom_params"></a>`apache_vhost_custom_params`
+
+Data type: `Hash[String[1], Any]`
+
+Additional parameters to pass to apache::vhost.
+
+Default value: `{}`
+
+### <a name="zabbix--zabbixapi"></a>`zabbix::zabbixapi`
+
+This will install the zabbixapi gem.
+
+#### Parameters
+
+The following parameters are available in the `zabbix::zabbixapi` class:
+
+* [`zabbix_version`](#-zabbix--zabbixapi--zabbix_version)
+* [`puppetgem`](#-zabbix--zabbixapi--puppetgem)
+
+##### <a name="-zabbix--zabbixapi--zabbix_version"></a>`zabbix_version`
+
+Data type: `Any`
+
+This is the zabbix version.
+
+Default value: `$zabbix::params::zabbix_version`
+
+##### <a name="-zabbix--zabbixapi--puppetgem"></a>`puppetgem`
+
+Data type: `Any`
+
+Provider for the zabbixapi gem package.
+
+Default value: `$zabbix::params::puppetgem`
 
 ### <a name="zabbix--zapache"></a>`zabbix::zapache`
 
@@ -5927,16 +6031,14 @@ Default value: `'0644'`
 
 ### <a name="zabbix_application"></a>`zabbix_application`
 
-%q(Manage zabbix applications
+Manage zabbix applications
 
-    zabbix_application{"app1":
-      ensure   => present,
-      template => 'template1',
-    }
-
+Example:
+  zabbix_application{"app1":
+    ensure   => present,
+    template => 'template1',
+  }
 It Raise exception on deleting an application which is a part of used template.
-
-)
 
 #### Properties
 
@@ -5975,7 +6077,7 @@ template to which the application is linked
 
 ### <a name="zabbix_host"></a>`zabbix_host`
 
-FQDN of the machine.
+Manage zabbix hosts
 
 #### Properties
 
@@ -5988,10 +6090,6 @@ Valid values: `present`, `absent`
 The basic property that the resource should be in.
 
 Default value: `present`
-
-##### `group`
-
-Deprecated! Name of the hostgroup.
 
 ##### `groups`
 
@@ -6114,7 +6212,7 @@ usually discover the appropriate provider for your platform.
 
 ### <a name="zabbix_proxy"></a>`zabbix_proxy`
 
-FQDN of the proxy.
+Manage zabbix proxies
 
 #### Properties
 
@@ -6172,7 +6270,7 @@ usually discover the appropriate provider for your platform.
 
 ### <a name="zabbix_template"></a>`zabbix_template`
 
-The name of template.
+Manage zabbix templates
 
 #### Properties
 
@@ -6250,12 +6348,12 @@ Zabbix version that the template will be installed on.
 ### <a name="zabbix_template_host"></a>`zabbix_template_host`
 
 Link or Unlink template to host. Only for Zabbix < 6.0!
-Example.
-Name should be in the format of "template_name@hostname"
 
-zabbix_template_host{ 'mysql_template@db1':
-      ensure => present,
-    }
+Example:
+  zabbix_template_host{ 'mysql_template@db1':
+    ensure => present,
+  }
+Name should be in the format of "template_name@hostname"
 
 #### Properties
 
@@ -6291,7 +6389,7 @@ will usually discover the appropriate provider for your platform.
 
 ### <a name="zabbix_userparameters"></a>`zabbix_userparameters`
 
-An unique name for this define.
+Manage zabbix user templates
 
 #### Properties
 
@@ -6343,7 +6441,7 @@ Alias of `Enum['postgresql', 'mysql', 'sqlite']`
 
 ### <a name="Zabbix--Historyics"></a>`Zabbix::Historyics`
 
-The Zabbix::Historyics data type.
+Type for size values in bytes (also allows k/K and m/M as appendix)
 
 Alias of `Optional[Pattern[/^\d+[k|K|m|M]?$/]]`
 

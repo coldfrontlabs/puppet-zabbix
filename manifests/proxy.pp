@@ -59,10 +59,12 @@
 # @param offlinebuffer Proxy will keep data for N hours in case if no connectivity with Zabbix Server
 # @param heartbeatfrequency Unique nodeid in distributed setup.
 # @param configfrequency How often proxy retrieves configuration data from Zabbix Server in seconds.
+# @param proxyconfigfrequency How often proxy retrieves configuration data from Zabbix Server in seconds (Zabbix 6.4).
 # @param datasenderfrequency Proxy will send collected data to the Server every N seconds.
 # @param startpollers Number of pre-forked instances of pollers.
 # @param startpreprocessors Number of pre-forked instances of preprocessing workers
 # @param startipmipollers Number of pre-forked instances of ipmi pollers.
+# @param startodbcpollers Number of pre-forked instances of ODBC pollers.
 # @param startpollersunreachable Number of pre-forked instances of pollers for unreachable hosts (including ipmi).
 # @param starttrappers Number of pre-forked instances of trappers.
 # @param startpingers Number of pre-forked instances of icmp pingers.
@@ -129,6 +131,7 @@
 # @param fpinglocation Location of fping.
 # @param fping6location Location of fping6.
 # @param sshkeylocation Location of public and private keys for ssh checks and actions.
+# @param statsallowedip list of allowed ipadresses that can access the internal stats of zabbix proxy over network
 # @param sslcalocation_dir Location of certificate authority (CA) files for SSL server certificate verification.
 # @param sslcertlocation_dir Location of SSL client certificate files for client authentication.
 # @param sslkeylocation_dir Location of SSL private key files for client authentication.
@@ -234,9 +237,11 @@ class zabbix::proxy (
   $offlinebuffer                                                              = $zabbix::params::proxy_offlinebuffer,
   $heartbeatfrequency                                                         = $zabbix::params::proxy_heartbeatfrequency,
   $configfrequency                                                            = $zabbix::params::proxy_configfrequency,
+  Optional[Integer[1,604800]] $proxyconfigfrequency                           = $zabbix::params::proxy_proxyconfigfrequency,
   $datasenderfrequency                                                        = $zabbix::params::proxy_datasenderfrequency,
   $startpollers                                                               = $zabbix::params::proxy_startpollers,
   $startipmipollers                                                           = $zabbix::params::proxy_startipmipollers,
+  Integer[0, 1000] $startodbcpollers                                          = $zabbix::params::proxy_startodbcpollers,
   $startpollersunreachable                                                    = $zabbix::params::proxy_startpollersunreachable,
   Integer[1, 1000] $startpreprocessors                                        = $zabbix::params::proxy_startpreprocessors,
   $starttrappers                                                              = $zabbix::params::proxy_starttrappers,
@@ -264,7 +269,7 @@ class zabbix::proxy (
   $historyindexcachesize                                                      = $zabbix::params::proxy_historyindexcachesize,
   $historytextcachesize                                                       = $zabbix::params::proxy_historytextcachesize,
   $timeout                                                                    = $zabbix::params::proxy_timeout,
-  $tlsaccept                                                                  = $zabbix::params::proxy_tlsaccept,
+  Optional[Variant[Array[Enum['unencrypted','psk','cert']],Enum['unencrypted','psk','cert']]] $tlsaccept = $zabbix::params::proxy_tlsaccept,
   $tlscafile                                                                  = $zabbix::params::proxy_tlscafile,
   $tlscertfile                                                                = $zabbix::params::proxy_tlscertfile,
   $tlsconnect                                                                 = $zabbix::params::proxy_tlsconnect,
@@ -288,6 +293,7 @@ class zabbix::proxy (
   $fpinglocation                                                              = $zabbix::params::proxy_fpinglocation,
   $fping6location                                                             = $zabbix::params::proxy_fping6location,
   $sshkeylocation                                                             = $zabbix::params::proxy_sshkeylocation,
+  Optional[String[1]] $statsallowedip                                         = $zabbix::params::proxy_statsallowedip,
   $logslowqueries                                                             = $zabbix::params::proxy_logslowqueries,
   $tmpdir                                                                     = $zabbix::params::proxy_tmpdir,
   $allowroot                                                                  = $zabbix::params::proxy_allowroot,
@@ -305,12 +311,6 @@ class zabbix::proxy (
     fail('Archlinux is currently not supported for zabbix::proxy ')
   }
 
-  if $facts['os']['family'] == 'Debian' and versioncmp($facts['os']['release']['major'], '11') == 0 {
-    if versioncmp($zabbix_version, '5.2') == 0 {
-      fail('Zabbix 5.2 is not supported on Debian 11!')
-    }
-  }
-
   # Find if listenip is set. If not, we can set to specific ip or
   # to network name. If more than 1 interfaces are available, we
   # can find the ipaddress of this specific interface if listenip
@@ -323,6 +323,8 @@ class zabbix::proxy (
     } else {
       $listen_ip = undef
     }
+  } else {
+    $listen_ip = undef
   }
 
   # So if manage_resources is set to true, we can send some data
@@ -426,32 +428,11 @@ class zabbix::proxy (
     }
   }
 
-  # Now we are going to install the correct packages.
-  case $facts['os']['name'] {
-    'redhat', 'centos', 'oraclelinux', 'VirtuozzoLinux': {
-      #There is no zabbix-proxy package in 3.0
-      if versioncmp('3.0',$zabbix_version) > 0 {
-        package { 'zabbix-proxy':
-          ensure  => $zabbix_package_state,
-          require => Package["zabbix-proxy-${db}"],
-          tag     => 'zabbix',
-        }
-      }
-
-      # Installing the packages
-      package { "zabbix-proxy-${db}":
-        ensure => $zabbix_package_state,
-        tag    => 'zabbix',
-      }
-    } # END 'redhat','centos','oraclelinux'
-    default : {
-      # Installing the packages
-      package { "zabbix-proxy-${db}":
-        ensure => $zabbix_package_state,
-        tag    => 'zabbix',
-      }
-    } # END default
-  } # END case $facts['os']['name']
+  # Installing the packages
+  package { "zabbix-proxy-${db}":
+    ensure => $zabbix_package_state,
+    tag    => 'zabbix',
+  }
 
   # Controlling the 'zabbix-proxy' service
   if $manage_service {
@@ -519,10 +500,10 @@ class zabbix::proxy (
   # Manage firewall
   if $manage_firewall {
     firewall { '151 zabbix-proxy':
-      dport  => $listenport,
-      proto  => 'tcp',
-      jump => 'accept',
-      state  => [
+      dport => $listenport,
+      proto => 'tcp',
+      jump  => 'accept',
+      state => [
         'NEW',
         'RELATED',
         'ESTABLISHED',

@@ -8,23 +8,27 @@ describe 'zabbix::server' do
     'rspec.puppet.com'
   end
 
-  on_supported_os(baseline_os_hash).each do |os, facts|
-    next if facts[:osfamily] == 'Archlinux' # zabbix server is currently not supported on archlinux
+  on_supported_os.each do |os, facts|
+    next if %w[Archlinux FreeBSD AIX Gentoo].include?(facts[:os]['family']) # zabbix server is currently not supported
     next if facts[:os]['name'] == 'windows'
 
     context "on #{os}" do
       let(:facts) { facts }
 
-      zabbix_version = '5.0'
+      zabbix_version = '6.0'
 
       describe 'with default settings' do
         it { is_expected.to contain_class('zabbix::repo') }
         it { is_expected.to contain_class('zabbix::params') }
         it { is_expected.to contain_service('zabbix-server').with_ensure('running') }
-        it { is_expected.to contain_zabbix__startup('zabbix-server') }
+        it { is_expected.not_to contain_zabbix__startup('zabbix-server') }
+
+        it { is_expected.to contain_apt__source('zabbix') }      if facts[:os]['family'] == 'Debian'
+        it { is_expected.to contain_apt__key('zabbix-A1848F5') } if facts[:os]['family'] == 'Debian'
+        it { is_expected.to contain_apt__key('zabbix-FBABD5F') } if facts[:os]['family'] == 'Debian'
       end
 
-      if facts[:osfamily] == 'RedHat'
+      if facts[:os]['family'] == 'RedHat'
         describe 'with enabled selinux' do
           let :params do
             {
@@ -37,6 +41,8 @@ describe 'zabbix::server' do
           end
 
           it { is_expected.to contain_selboolean('zabbix_can_network').with('value' => 'on', 'persistent' => true) }
+          it { is_expected.to contain_selinux__module('zabbix-server').with_ensure('present') }
+          it { is_expected.to contain_selinux__module('zabbix-server-ipc').with_ensure('present') }
         end
 
         describe 'with defaults' do
@@ -79,6 +85,7 @@ describe 'zabbix::server' do
         it { is_expected.to contain_package('zabbix-server-mysql').with_ensure('present') }
         it { is_expected.to contain_package('zabbix-server-mysql').with_name('zabbix-server-mysql') }
         it { is_expected.to contain_file('/etc/zabbix/zabbix_server.conf').with_require('Package[zabbix-server-mysql]') }
+        it { is_expected.to contain_exec('zabbix_server_create.sql') }
       end
 
       # Include directory should be available.
@@ -145,25 +152,26 @@ describe 'zabbix::server' do
         it { is_expected.not_to contain_firewall('151 zabbix-server') }
       end
 
-      context 'it creates a startup script' do
-        case facts[:osfamily]
-        when 'Archlinux', 'Debian', 'Gentoo', 'RedHat'
-          it { is_expected.to contain_file('/etc/init.d/zabbix-server').with_ensure('absent') }
-          it { is_expected.to contain_file('/etc/systemd/system/zabbix-server.service').with_ensure('file') }
-        else
-          it { is_expected.to contain_file('/etc/init.d/zabbix-server').with_ensure('file') }
-          it { is_expected.not_to contain_file('/etc/systemd/system/zabbix-server.service') }
-        end
-      end
-
-      context 'when declaring manage_startup_script is false' do
+      context 'when declaring manage_startup_script is true' do
         let :params do
           {
-            manage_startup_script: false
+            manage_startup_script: true
           }
         end
 
-        it { is_expected.not_to contain_zabbix__startup('zabbix-server') }
+        context 'it creates a startup script' do
+          case facts[:os]['family']
+          when 'Archlinux', 'Debian', 'Gentoo', 'RedHat'
+            it { is_expected.to contain_file('/etc/init.d/zabbix-server').with_ensure('absent') }
+            it { is_expected.to contain_file('/etc/systemd/system/zabbix-server.service').with_ensure('file') }
+            it { is_expected.to contain_systemd__unit_file('zabbix-server.service') }
+          else
+            it { is_expected.to contain_file('/etc/init.d/zabbix-server').with_ensure('file') }
+            it { is_expected.not_to contain_file('/etc/systemd/system/zabbix-server.service') }
+          end
+        end
+
+        it { is_expected.to contain_zabbix__startup('zabbix-server') }
       end
 
       # If manage_service is true (default), it should create a service
@@ -194,7 +202,7 @@ describe 'zabbix::server' do
           {
             alertscriptspath: '${datadir}/zabbix/alertscripts',
             allowroot: '1',
-            cachesize: '8M',
+            cachesize: '32M',
             cacheupdatefrequency: '30',
             database_host: 'localhost',
             database_name: 'zabbix-server',
@@ -259,7 +267,7 @@ describe 'zabbix::server' do
             valuecachesize: '4M',
             vmwarecachesize: '8M',
             vmwarefrequency: '60',
-            zabbix_version: '5.0',
+            zabbix_version: '6.0',
             tlsciphercert: 'EECDH+aRSA+AES128:RSA+aRSA+AES128',
             tlsciphercert13: 'EECDH+aRSA+AES128:RSA+aRSA+AES128',
             tlscipherpsk: 'kECDHEPSK+AES128:kPSK+AES128',
@@ -271,7 +279,7 @@ describe 'zabbix::server' do
 
         it { is_expected.to contain_file('/etc/zabbix/zabbix_server.conf').with_content %r{^AlertScriptsPath=\$\{datadir\}/zabbix/alertscripts} }
         it { is_expected.to contain_file('/etc/zabbix/zabbix_server.conf').with_content %r{^AllowRoot=1} }
-        it { is_expected.to contain_file('/etc/zabbix/zabbix_server.conf').with_content %r{^CacheSize=8M} }
+        it { is_expected.to contain_file('/etc/zabbix/zabbix_server.conf').with_content %r{^CacheSize=32M} }
         it { is_expected.to contain_file('/etc/zabbix/zabbix_server.conf').with_content %r{^CacheUpdateFrequency=30} }
         it { is_expected.to contain_file('/etc/zabbix/zabbix_server.conf').with_content %r{^DBHost=localhost} }
         it { is_expected.to contain_file('/etc/zabbix/zabbix_server.conf').with_content %r{^DBName=zabbix-server} }
@@ -345,14 +353,18 @@ describe 'zabbix::server' do
       end
 
       context 'with zabbix_server.conf and version 5.0' do
+        next if facts[:os]['family'] == 'RedHat' && facts[:os]['release']['major'] == '9'
+
         let :params do
           {
             socketdir: '/var/run/zabbix',
+            startodbcpollers: 1,
             zabbix_version: '5.0'
           }
         end
 
         it { is_expected.to contain_file('/etc/zabbix/zabbix_server.conf').with_content %r{^SocketDir=/var/run/zabbix} }
+        it { is_expected.to contain_file('/etc/zabbix/zabbix_server.conf').without_content %r{^StartODBCPollers=1} }
       end
 
       context 'with zabbix_server.conf and logtype declared' do
@@ -390,37 +402,6 @@ describe 'zabbix::server' do
           it { is_expected.to contain_file('/etc/zabbix/zabbix_server.conf').with_content %r{^LogType=file$} }
           it { is_expected.to contain_file('/etc/zabbix/zabbix_server.conf').with_content %r{^LogFile=/var/log/zabbix/zabbix_server.log$} }
           it { is_expected.to contain_file('/etc/zabbix/zabbix_server.conf').with_content %r{^LogFileSize=10$} }
-        end
-      end
-
-      # Zabbix Server 5.2 is not supported on RedHat family and Debian 11
-      if facts[:osfamily] != 'RedHat' && facts[:os]['release']['major'] != '11'
-        describe 'with zabbix_version 5.2 and Vault parameters defined' do
-          let :params do
-            {
-              zabbix_version: '5.2',
-              vaultdbpath: 'secret/zabbix/database',
-              vaulttoken: 'FKTYPEGL156DK',
-              vaulturl: 'https://127.0.0.1:8200',
-            }
-          end
-
-          it { is_expected.to contain_file('/etc/zabbix/zabbix_server.conf').with_content %r{^VaultDBPath=secret/zabbix/database$} }
-          it { is_expected.to contain_file('/etc/zabbix/zabbix_server.conf').with_content %r{^VaultToken=FKTYPEGL156DK$} }
-          it { is_expected.to contain_file('/etc/zabbix/zabbix_server.conf').with_content %r{^VaultURL=https://127.0.0.1:8200$} }
-        end
-
-        describe 'with zabbix_version 5.4 and report parameters defined' do
-          let :params do
-            {
-              zabbix_version: '5.4',
-              startreportwriters: 1,
-              webserviceurl: 'http://localhost:10053/report',
-            }
-          end
-
-          it { is_expected.to contain_file('/etc/zabbix/zabbix_server.conf').with_content %r{^StartReportWriters=1} }
-          it { is_expected.to contain_file('/etc/zabbix/zabbix_server.conf').with_content %r{^WebServiceURL=http://localhost:10053/report} }
         end
       end
     end
